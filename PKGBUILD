@@ -6,7 +6,6 @@ pkgname=('powernap_common'
          'powernap_server'
 )
 
-
 pkgver=2.18
 pkgrel=1
 arch=('i686' 'x86_64')
@@ -59,6 +58,9 @@ install -Dm644 "$srcdir/powernap-$pkgver/powernap/__init__.py" "$pkgdir/usr/lib/
 package_powernap_server() {
     pkgdesc="Daemon which puts server into standby when it is idle. Server packages..."
     depends=()
+    backup=('etc/powernap/config'
+            'etc/powernap/action')
+install -Dm644 "$srcdir/powernap-$pkgver/etc/systemd/system/powernapd.service" "$pkgdir/etc/systemd/system/powernapd.service"
 install -Dm644 "$srcdir/powernap.conf" "$pkgdir/etc/init/powernap.conf"
 install -Dm755 "$srcdir/powernap-$pkgver/action" "$pkgdir/etc/powernap/action"
 install -Dm644 "$srcdir/powernap-$pkgver/config" "$pkgdir/etc/powernap/config"
@@ -66,7 +68,6 @@ install -Dm744 "$srcdir/powernap-$pkgver/bin/powernap_calculator" "$pkgdir/usr/b
 install -Dm755 "$srcdir/powernap-$pkgver/sbin/powernap" "$pkgdir/usr/sbin/powernap"
 install -Dm755 "$srcdir/powernap-$pkgver/sbin/powernap-action" "$pkgdir/usr/sbin/powernap-action"
 install -Dm755 "$srcdir/powernap-$pkgver/sbin/powernap-now" "$pkgdir/usr/sbin/powernap-now"
-#install -Dm755 "$srcdir/powernap-$pkgver/sbin/powernapd" "$pkgdir/usr/sbin/powernapd"
 install -Dm755 "$srcdir/powernap-$pkgver/sbin/powernapd" "$pkgdir/usr/sbin/powernapd"
 install -Dm755 "$srcdir/powernap-$pkgver/sbin/powerwake-now" "$pkgdir/usr/sbin/powerwake-now"
 install -Dm644 "$srcdir/powernap-$pkgver/man/powernap_calculator.1" "$pkgdir/usr/share/man/man1/powernap_calculator.1"
