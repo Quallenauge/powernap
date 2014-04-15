@@ -1,0 +1,13 @@
+[Unit]
+Description=Start powernap daemon
+
+[Service]
+Type=forking
+ExecStartPre=
+ExecStart=/usr/bin/python /usr/bin/powernapd
+ExecStartPost=
+PIDFile=/var/run/powernap.pid
+
+[Install]
+WantedBy=multi-user.target
+
