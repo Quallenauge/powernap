@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+#    lowest_cpu_freq: This script lowers the frequency of the cpus by changing
+#                     the scaling_governor from "ondemand" to "powersave"
+#
+#    Copyright (C) 2010 Canonical Ltd.
+#
+#    Authors: Andres Rodriguez <andreserl@ubuntu.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, version 3 of the License.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+RUNDIR="/var/run/powernap"
+GOVERNOR="/var/run/powernap/cpu_governor.default"
+CPUFILE="/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+full_power=`head -1 $CPUFILE`
+save_power="powersave"
+
+# Creates the $RUNDIR if it does not exists
+if [ ! -f $RUNDIR ]; then
+	mkdir -p $RUNDIR
+fi
+
+# If governor is set to ondemand on boot, save as the default governor.
+# NOTE: Only for cases when Ubuntu machine is running on *battery* and
+# 'pm-powersave true' is executed on boot by S99acpi-support (power.sh),
+# and  before the governor is set to ondemand. Otherwise, it will save
+# 'performance' as the default governor.
+if [ -h /etc/rc3.d/S99acpi-support ] && [ -h /etc/rc3.d/S99ondemand ]; then
+	full_power="ondemand"
+fi
+
+set_cpu_governor() {
+	for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+		[ -w "$cpu" ] || continue
+		echo $1 > $cpu
+	done
+}
+
+help() {
+	echo "Lowers the CPU frequency, changing the scaling governor from $full_power to $save_power."
+}
+
+case $1 in
+	true)
+		# Save current governor and change governor to powersave
+		if [ ! -f $GOVERNOR ]; then
+			echo $full_power > $GOVERNOR
+		fi
+		set_cpu_governor $save_power
+		;;
+	false)
+		# Restore governor to default
+		if [ -f $GOVERNOR ]; then
+			full_power=`head -1 $GOVERNOR`
+			set_cpu_governor $full_power
+		fi
+		;;
+	help) help;;
+	*)
+		exit $NA ;;
+esac

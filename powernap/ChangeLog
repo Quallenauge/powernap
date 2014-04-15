@@ -1,0 +1,498 @@
+powernap (2.18) released; urgency=low
+
+  [ Frank Steinberg ]
+  * LoadMonitor: handle float values correctly (LP: #1070696)
+  * TCPMonitor: handle IPv6 connections correctly (LP: #1070695)
+
+  [ Andres Rodriguez ]
+  * debian/powernap.default: Add so that powernap does not start by default.
+
+ -- Andres Rodriguez <andreserl@ubuntu.com>  Mon, 04 Jun 2012 12:59:15 -0400
+
+powernap (2.17-0ubuntu1) precise; urgency=low
+
+  [ Bryce Harrington ]
+  * actions/{service,kernel_module}: Add scripts to handle services and
+    kernel modules on powersave mode.
+
+  [ Andres Rodriguez ]
+  * Re-organize source to differ between pm-utils actions and powernap
+    actions.
+    - debian/powernap-common.install: Update.
+    - powernap.spec: Update.
+  * Disable SERVICES and KERN_MODULES on PowerSave mode (LP: #887684):
+    - powernap/powernap.py: Load from config.
+    - debian/powernap-common.install: Install new scripts.
+    - Add take powersave action and its recover equivalent.
+  * actions/pm/01cpu_online: Disable by default.
+
+ -- Andres Rodriguez <andreserl@ubuntu.com>  Thu, 01 Dec 2011 12:43:51 -0500
+
+powernap (2.16-0ubuntu1) precise; urgency=low
+
+  [ Andres Rodriguez ]
+  * debian/control: Move python-scapy Depends to Suggests.
+  * Do not use awk to parse output. (LP: #879591)
+    - bin/powerwake
+    - powerwake/powerwake.py
+
+  [ Eric Sandeen ]
+  * powernap.spec: cleaned up a bit for better building/installation on RH
+    systems
+
+  [ Remi Druilhe ]
+  * Dynamically reload configuration file (LP: #887680)
+
+ -- Andres Rodriguez <andreserl@ubuntu.com>  Tue, 29 Nov 2011 14:42:41 -0500
+
+powernap (2.15-0ubuntu1) oneiric; urgency=low
+
+  * actions/eth_speed: Disable by default to not experience connectivity
+    loss on certain network configs. (LP: #730210)
+
+ -- Andres Rodriguez <andreserl@ubuntu.com>  Fri, 09 Sep 2011 15:32:30 -0400
+
+powernap (2.14-0ubuntu1) oneiric; urgency=low
+
+  * bin/powerwake:
+    - fix the powerake mac caching methodology, which was somewhat broken
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Mon, 22 Aug 2011 00:38:17 -0500
+
+powernap (2.13-0ubuntu1) oneiric; urgency=low
+
+  [ Dustin Kirkland ]
+  * sbin/powernapd:
+    - make sure that powerwake-now works, even if a system has gone into
+      powersave mode by other means (erhm, gnome-power-settings, erhm)
+  * actions/01cpu_online:
+    - drop the nasty sleep 10 hack around gnome-settings-daemon bugginess;
+      doesn't seem to be a problem at this point in Oneiric;  If this bug
+      shows back up, we need to solve it in a better way
+  * actions/video:
+    - drop incorrect inline docs
+  * config:
+    - now that the default is powersave mode, adjust the absent time and
+      grace period; it takes fractions of a second to go in and out of
+      powersave mode
+  * actions/00flag, debian/powernap.upstart, sbin/powernapd: LP: #829618
+    - use a flag in shared memory that notes the powersave status of the
+      system
+    - set/remove that flag in the 00flag script in the pm-utils suite
+    - set/remove/query that same flag in powernapd itself
+  * debian/control: LP: #637635
+    - depend on anacron, to better handle server cronjobs on systems that
+      might have been asleep
+  * powernap/monitors/InputMonitor.py: LP: #826278
+    - test device path existence before opening, fixes nasty crash
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Fri, 19 Aug 2011 09:57:07 -0700
+
+powernap (2.12-0ubuntu1) oneiric; urgency=low
+
+  [ Andres Rodriguez ]
+  * Add Initial PowerNap (powerwaked) Server Capabilities:
+    - powerwake/*: Add module and Initial ARPMonitor (LP: #737479).
+    - powerwaked.conf: Add config file.
+    - powerwaked: Add daemon.
+    - powerwake-monitor: Add tool to add, delete, list, etc.
+  * Package powernap-server:
+    - debian/control: Add powerwaked, powerwake-common, powernap-server
+    - debian/{powerwaked,powerwake-common}.install: Add
+    - debian/powerwaked.upstart: Add upstart job.
+
+  [ Dustin Kirkland ]
+  * bin/powerwake:
+    - only seed the arp cache if the argument is not already a mac address
+
+ -- Andres Rodriguez <andreserl@ubuntu.com>  Tue, 09 Aug 2011 15:28:35 -0400
+
+powernap (2.11-0ubuntu1) oneiric; urgency=low
+
+  * actions/01cpu_online: Delay disabling of CPU's when machine is Desktop
+    to allow it to apply template and not crash.
+
+ -- Andres Rodriguez <andreserl@ubuntu.com>  Mon, 20 Jun 2011 18:08:09 -0400
+
+powernap (2.10-0ubuntu1) oneiric; urgency=low
+
+  * Add support for port ranges to TCPMonitor (LP: #760729)
+    - powernap/monitors/TCPMonitor.py: Add support.
+    - powernap/powernap.py: Ensure that ports are now passed as strings.
+    - config: Update to reflect new feature.
+  * debian/control:
+    - Bump Build-Depends on debhelper.
+    - Change python supported version.
+    - Update Bzr-VCS to current.
+    - Set Dustin as Original maintainer and set myself as maintainer.
+
+ -- Andres Rodriguez <andreserl@ubuntu.com>  Thu, 09 Jun 2011 16:42:59 -0400
+
+powernap (2.9-0ubuntu1) oneiric; urgency=low
+
+  * sbin/powernap, sbin/powernapd:
+    - add an indicator to show when powernap is engaged, remove after waking
+  * === added directory debian/source, debian/source/format:
+    - add this back in (got a fix for release scripts)
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Thu, 02 Jun 2011 17:43:23 -0400
+
+powernap (2.8-0ubuntu1) oneiric; urgency=low
+
+  [ Andres Rodriguez ]
+  * Switch to dpkg-source 3.0 (quilt) format
+  * Switch to dh_python2 instead of dh_pycentral
+  * sbin/powernap: ACTION_METHOD is now passed as an argument.
+  * Second Stage Action Method (LP: #711521)
+    - config: Add config options.
+    - powernap/powernap.py: Add loading of config values.
+    - sbin/powernapd: Add logic to handle second stage action.
+
+  [ Dustin Kirkland ]
+  * config: remove trailing whitespace
+  * debian/source/format, === removed directory debian/source:
+    - drop these for now, as they're breaking the release scripts
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Thu, 02 Jun 2011 16:51:20 -0400
+
+powernap (2.7-0ubuntu1) oneiric; urgency=low
+
+  [ Jim Heck ]
+  * DiskMonitor: Tracks disks activity by monitoring its state. If
+    "standby/sleeping" they are assumed to be inactive. (LP: #738764).
+
+  [ Mathieu Bérard ]
+  * actions/kms_powermode: Add action method to enable power management for
+    radeon kms driver. Should be removed when applied upstream or pm-utils.
+
+  [ Andres Rodriguez ]
+  * sbin/powernapd: Take recover action when entered to powersave with
+    powernap-now (LP: #768598)
+
+  [ Dustin Kirkland ]
+  * powernap/monitors/LoadMonitor.py: scale monitors correctly, LP: #777361
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Wed, 04 May 2011 14:44:50 -0500
+
+powernap (2.6-0ubuntu1) natty; urgency=low
+
+  [ Andres Rodriguez ]
+  * debian/copyright: Update upstream authors and license years.
+  * powernap/monitors/IOMonitor.py: If processes do not have a command line,
+    search regex in the 'Name:' field of /proc/<PID>/status (LP: #735452)
+  * actions/cpu_frequency: Fix saving/restoring of wrong governor (LP: #743682)
+    Thanks to Mathieu Berard for the patch.
+    - Additionally, save 'ondemand' as default when acpi-support and ondemand
+      are run on boot to handle special case when running on battery.
+  * debian/powernap.{preinst,postinst}: Add logic to handle the upgrade of
+    the config file as format has changed. (LP: #744588)
+    - install copy of config file in /usr/share/powernap to help with this.
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Fri, 01 Apr 2011 17:21:48 -0500
+
+powernap (2.5-0ubuntu1) natty; urgency=low
+
+  [ Andres Rodriguez ]
+  * Add support to load confs from /etc/powernap/config.d. Added to leverage
+    compatibility with other applications, such as Eucalytpus. (LP: #711587)
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Mon, 14 Mar 2011 17:37:16 -0500
+
+powernap (2.4-0ubuntu1) natty; urgency=low
+
+  [ Andres Rodriguez ]
+  * Fix wall message timestamp (LP: #718242)
+  * Add powerwake-now support. Sends signal to powernapd to wakeup
+    powersave mode if the daemon is in powersave.
+  * debian/powernap.upstart: Add pre-stop.
+    - Issues 'powerwake-now' to wake up system if stopping while in powersave.
+    - Add 'sleep 3' to wait for recover action to take place before actually
+      stopping powernapd. Otherwise, it won't recover.
+  * bin/powernapd: Set flags back to initial values if GRACE PERIOD completed.
+    Ensures that flags have correct values if powerwake-now signal was received.
+
+  [ Dustin Kirkland ]
+  * sbin/powernapd: only display wall message if action is other than
+    powersave
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Thu, 17 Feb 2011 07:36:20 -0600
+
+powernap (2.3-0ubuntu1) natty; urgency=low
+
+  [ Andres Rodriguez ]
+  * config,sbin/powernapd,powernap/powernap.py: New option to decide if
+    powernapd will WARN the user via a wall message. Default yes.
+  * sbin/powernapd: Use a Timestamp when sending the wall message.
+  * InputMonitor now only enables/disables keyboard and mouse monitoring.
+    - powernap/monitors/InputMonitor.py: Match regex in /by-id for kbd.
+    - powernap/powernap.py: Support only mouse/keyboard
+    - config: Only add options for mouse/keyboard.
+  * Enabled InputMonitors by default.
+    - config: Enable.
+    - powernap.py: Only try to initialize if "mouse" or "kbd" are connected
+      by looking into /dev/input/by-id.
+  * powernapd: Add SIGIO handler. Ignores failure caused when disconnecting
+    a monitored USB InputDevice, that caused powernapd to stop running.
+
+  [ Dustin Kirkland ]
+  * man/powernap-action.8, man/powernap_calculator.1: fix lintian warnings,
+    escpae hyphens
+  * debian/control: update package descriptions
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Tue, 08 Feb 2011 23:10:40 -0600
+
+powernap (2.2-0ubuntu1) natty; urgency=low
+
+  [ Andres Rodriguez ]
+  * actions:
+    - cpu_smp_sched,eth_wol: Dropped. pm-utils provides its own verion.
+    - cpu_frequency: Store default governor to reset it to default value.
+  * debian/rules: run dh_installdeb *after* dh_pycentral.
+  * Add lintian-overrides (LP: #706974)
+  * sbin/powernap: Fix pm-powersave command path.
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Fri, 28 Jan 2011 10:46:38 -0600
+
+powernap (2.1-0ubuntu1) natty; urgency=low
+
+  [ Andres Rodriguez ]
+  * config:
+    - Default ACTION to pm-powersave instead of best-effort.
+    - Enable WoLMonitor and ConsoleMonitor by default
+    - Disable ProcessMonitor by default.
+    - Change powersave defaults to 0 instead of 4. Update related files.
+  * powernap/monitors:
+    - Rename RemoteMonitor to UDPMonitor.
+    - Add WoLMonitor and support to run it.
+    - Add ConsoleMonitor and support to run it.
+  * powernap/powernap.py:
+    - Improve config loading method for Monitors.
+  * sbin/powernapd: Change approach of powernapd_loop.
+    - GRACE period is time between ABSENT_SECONDS and
+      (ABSENT_SECONDS - GRACE_SECONDS)
+    - Only send a Wall message when on GRACE Period.
+    - Enable Monitors to run at all times. Specifically when in PowerSave.
+  * man/powernapd.8: Update to list available Monitors with description.
+  * Update Copyright years/email in some of the files.
+
+  [ Dustin Kirkland ]
+  * config, powernap/monitors/TCPMonitor.py, powernap/powernap.py:
+    - add a TCP Monitor
+  * config, powernap/monitors/LoadMonitor.py, powernap/powernap.py:
+    - add a system Load Monitor
+  * debian/control: bump standards version
+  * debian/rules: make sure powernapd starts on install, LP: #705959
+  * config: update service restart method
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Thu, 27 Jan 2011 16:38:22 -0600
+
+powernap (2.0-0ubuntu1) natty; urgency=low
+
+  [ Andres Rodriguez ]
+  * powernap/monitors: Re-work Monitors to integrate them with PowerNap.
+  * powernap/powernap.py: Minor fixes to not crash when loading monitors.
+  * sbin/powernapd: Integrate Monitors approach to work with Daemon.
+  * Update copyright headers for some files
+  * Update manpages and add one for powernap-action.
+  * Update packaging:
+    - debian/control: Add python related fileds.
+    - debian/rules: Add dh_pycentral related rules.
+  * Add new package to contain new modules and monitors:
+    - debian/control: Add package powernap-common.
+    - debian/powernap-common.install: Install new files (PowerNap class and
+      Monitors); Move action scripts installation to this package.
+  * sbin/powernapd: Improve WoL monitor to listen in eth* interfaces.
+  * config: Update and cleanup.
+  * sbin/powernapd,bin/powerwake: Fix generation of WoL Magic Packet.
+    Apparently, more data than required was addeed. (LP: #705943)
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Sat, 22 Jan 2011 09:09:04 -0600
+
+powernap (1.12-0ubuntu1) natty; urgency=low
+
+  [ Andres Rodriguez ]
+  * Revert Adam changes to some files (rev148 - Original PowerNap behavior)
+    - powernapd, powernapd.8, action, config.
+  * Re-organize the source and update the packaging:
+    - sbin: Moved powernap, powernapd, powernapd-now.
+    - bin: Moved powerwake, powernap_calculator.
+    - man: Moved manpages here.
+    - debian/{powernap,powerwake}.install: Update accordingly.
+    - debian/{powernap,powerwake}.manpages: Update accordingly.
+    - powernap/monitors: Moved Adam's Monitors.
+  * Add new powersave method, using pm-powersave:
+    - actions/: Add a set of scripts to reduce power consumption
+    - powernap-action: Add tool to enable/disable and list powersave actions.
+    - debian/powernap.install: Install new files.
+  * Provide ability to select a PowerNap method to perform.
+    - config: Add config variable to select method.
+    - powernap/{powernap,powernapd}: Make necessary changes.
+  * Add WoL monitor to 'wake up' for when 'pm-powersave' action is taken.
+    - sbin/powernapd: Add WoL Monitor.
+    - sbin/powerna: Take pm-powersave action correctly.
+  * Add class to handle config:
+    - powernap/powernap.py: Add class that handles config and initialization
+      of different monitors
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Tue, 11 Jan 2011 12:59:13 -0600
+
+powernap (1.11-0ubuntu1) natty; urgency=low
+
+  [ Adam Sutton ]
+  * reworked config file and config file parsing
+  * modularized the monitoring to a set of logical plugins
+  * added a monitor on a UDP port for staying awake
+
+  [ Nobuto MURATA ]
+  * powerwake_completion: add bash completion from $HOME/.cache/ethers,
+    LP: #675445
+  * debian/powernap.upstart: fix LP: #598241 cannot enable Wake-on-LAN
+    when ifconfig output is translated
+
+  [ Dustin Kirkland ]
+  * powerwake: test if home dir is writable (might not be, eg: www-data)
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Wed, 17 Nov 2010 17:15:25 -0600
+
+powernap (1.10-0ubuntu1) maverick; urgency=low
+
+  [ Nobuto MURATA ]
+  * debian/powerwake.install, powerwake_completion: add bash completion
+    for powerwake, LP: #551073
+
+  [ Dustin Kirkland ]
+  * powerwake: create the ~/.cache/ethers file, if it does not already
+    exist, LP: #582381
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Tue, 18 May 2010 12:33:32 -0500
+
+powernap (1.9-0ubuntu1) lucid; urgency=low
+
+  * debian/powernap.upstart: fix LP: #531950
+    - fix ethtool regex
+    - allow for admin customized ethtool script, when powernap's
+      is incorrect or undesired
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Thu, 04 Mar 2010 11:04:49 -0600
+
+powernap (1.8-0ubuntu1) lucid; urgency=low
+
+  * powerwake:
+    - test ethers file for writability, LP: #458163
+    - since non-priv users cannot write to globally cached ethers, support
+      local user eth caches
+  * powernap-now, debian/install:
+    - add a powernap-now utility, for sending the 'now'
+    signal to the daemon
+  * debian/powernap.manpages, powernap-now.8:
+    - add powernap-now manpages
+  * debian/powernap.init, debian/powernap.upstart, debian/rules:
+    - upstart-ify powernap
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Sat, 06 Feb 2010 22:34:34 -0600
+
+powernap (1.7-0ubuntu1) karmic; urgency=low
+
+  * debian/powernap.init: enable WoL at boot on interface(s) that support
+    wake-on-lan, to ensure that a powernapping system can be awoken
+    later, LP: #445950
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Wed, 19 Aug 2009 00:19:13 -0500
+
+powernap (1.6-0ubuntu1) karmic; urgency=low
+
+  [ Dan Nurmi ]
+  * powerwake: add support for a broadcast argument, add getopt support
+
+  [ Dustin Kirkland ]
+  * powerwake.1: updated to handle Dan's extensions and new arguments
+  * powernap_calculator, powernap_calculator.1: new script to help determine
+    the expected power savings usings powernap in a cloud environment;
+    manpage documentation added
+  * debian/powernap.logrotate: rotate the powernap log
+  * powernapd: overhaul powernap's logging using python's built-in logging
+    functionality
+  * debian/control: bump standards version
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Tue, 18 Aug 2009 19:12:43 -0500
+
+powernap (1.5-0ubuntu1) karmic; urgency=low
+
+  * powerwake: handle more gracefully the lack of an /etc/ethers file
+  * powernapd: fix timestamp
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Fri, 10 Jul 2009 17:37:54 -0500
+
+powernap (1.4-0ubuntu1) karmic; urgency=low
+
+  * powerwake: maintain and use a cache of mac addresses, in
+    /var/cache/powerwake/ethers; test is_mac() before adding to arp hash
+  * debian/powerwake.dirs, debian/powerwake.install,
+    debian/powerwake.postinst, debian/control: add a separate powerwake
+    package
+  * debian/manpages, debian/powerwake.manpages: added manpage debhelper
+    files
+  * debian/control: recommend ethtool, which might be necessary to enable
+    wake-on-lan on your ethernet card, powernap depends on pm-utils
+  * powernap -> powernapd, debian/init, debian/install: rename the python
+    powernap daemon 'powernapd'
+  * powernap.1 -> powernapd.8: renamed, note ethtool
+  * powernap: new script that will either take a specified action, or
+    run one of (pm-suspend, pm-hibernate, poweroff)
+  * powernap.8: document new script
+  * action: conffile describing what should go there
+  * debian/init: drop stdout on 'now' status check
+  * debian/*: use powernap.* and powerwake.* to remove any ambiguity
+  * powernapd: look for activity on /dev/* consoles and in /proc/interrupts
+    during the grace period, such that any activity will cancel the
+    powernap operation
+  * powerwake, powerwake.1: update to allow for static configuration
+    override in /etc/ethers
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Thu, 09 Jul 2009 17:28:44 -0500
+
+powernap (1.3-0ubuntu1) karmic; urgency=low
+
+  * config: add default value statement to each item; add sane defaults;
+    add grace period section
+  * powernap: add a system-wide warning message using 'wall', and a grace
+    seconds interval to cancel the operation of 60 seconds (by default);
+    move to using global variables for options defined in the config file
+  * debian/control: depend on bsdutils for 'wall' utility
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Mon, 29 Jun 2009 14:49:55 -0700
+
+powernap (1.2-0ubuntu1) karmic; urgency=low
+
+  * config, debian/control, powernap.1, powernap.py: lower the default
+    polling period from 10 seconds to 1 second; polling /proc is cheap,
+    and empirical testing has shown a negligible performance impact;
+    add a note about DEBUG
+  * powernap.py -> powernap:
+    - abstract take_action() to a function, add a handler for --now
+    - daemonize within the python script
+    - eliminate the shell wrapper
+    - log to /var/log/powernap.*
+    - add signal handling for "now", USR1
+  * powernap.1: add log files
+  * debian/init: add 'now' action and signal passing
+  * powerwake: initial cut at powerwake utility
+  * powerwake.1: initial cut at powerwake documentation
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Fri, 26 Jun 2009 17:23:22 -0500
+
+powernap (1.1-0ubuntu1) karmic; urgency=low
+
+  * debian/copyright: updated for Ubuntu inclusion
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Fri, 12 Jun 2009 12:53:54 -0500
+
+powernap (1.0-0ubuntu1) karmic; urgency=low
+
+  [ Initial release ]
+  * powernap: shell wrapper script
+  * powernap.py: python daemon
+  * config: global configuration file
+  * powernap.1: manpage documentation
+
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Thu, 11 Jun 2009 17:30:16 -0500

@@ -1,0 +1,8 @@
+PowerNap is a configurable daemon that will bring a running system to a lower power state according to a set of configuration preferences. It acts as a sort of "screensaver" for servers, watching the process table for activity rather than the keyboard or mouse.
+PowerNap will run $ACTION when none of $PROCESSES have executed for some number of $ABSENCE seconds.
+For instance, PowerNap can automatically "pm-suspend" a system if no instance of "kvm" runs for some contiguous block of "300" seconds.
+
+This repo is a "fork" of the original development of powernap, which is located at
+https://launchpad.net/powernap
+
+It is modified run with python3 and archlinux.

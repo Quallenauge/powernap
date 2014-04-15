@@ -1,0 +1,39 @@
+.TH powerwake 1 "26 Jun 2009" powerwake "powerwake"
+.SH NAME
+powerwake \- smart utilty for remotely waking sleeping systems
+
+.SH SYNOPSIS
+.BI "powerwake [\-b|\-\-broadcast BROADCAST_IP] [\-m|\-\-method METHOD] TARGET_MAC|TARGET_IP|TARGET_HOST"
+
+.SH OPTIONS
+.TP
+.B \-b|\-\-broadcast BROADCAST_IP
+Optional parameter specifying the broadcast ip.  If unspecified, the default is 255.255.255.255.
+.TP
+.B \-m|\-\-method METHOD
+Currently, 'wol' is the only supported method.
+.TP
+.B TARGET_MAC|TARGET_IP|TARGET_HOST
+The target system to powerwake may be identified by MAC address, or by an IP/hostname cached in (the current \fBarp\fP(8) table, \fI/etc/ethers\fP, \fI/var/cache/powerwake/ethers\fP).
+
+.SH DESCRIPTION
+The powerwake utility compliments the powernap(8) daemon.  Administrators can run the powernap utility on remote hosts, allowing them to sleep when un-utilitized.  To awake the remote system, use powerwake.
+
+Powerwake is designed to be "smart", and support multiple methods of waking remote hosts, such as wakeonlan, ipmi, and others.  Currently, wakeonlan is the only implemented mechanism, though others are intended.
+
+Powerwake is also "smart" in that it can take MAC address, hostnames, or ip addresses.  In the case of a hostname or ip address, powerwake will first load a dynamically maintained cache file \fI/var/cache/powerwake/ethers\fP, then a statically administered configuration file \fI/etc/ethers\fP, and finally use the arp table to determine the target MAC address.  The cache will be updated accordingly.
+
+.TP
+\fIhttp://launchpad.net/powernap\fP
+.PD
+
+.SH FILES
+\fI/etc/ethers\fP, \fI/var/cache/powerwake/ethers\fP
+
+.SH SEE ALSO
+\fBarp\fP(8)
+
+.SH AUTHOR
+This manpage and the utility was written by Dustin Kirkland <kirkland@canonical.com> for Ubuntu systems (but may be used by others).  Permission is granted to copy, distribute and/or modify this document under the terms of the GNU General Public License, Version 3 published by the Free Software Foundation.
+
+On Debian systems, the complete text of the GNU General Public License can be found in /usr/share/common-licenses/GPL.

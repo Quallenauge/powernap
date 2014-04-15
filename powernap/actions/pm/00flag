@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+#    flag: touch or remove a flag file, indicating powersave mode;
+#
+#    Copyright (C) 2011 Canonical Ltd.
+#
+#    Authors: Dustin Kirkland <kirkland@ubuntu.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, version 3 of the License.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+RUNDIR="/var/run/powernap"
+FLAG="$RUNDIR/powersave"
+
+# Create the $RUNDIR if it does not exists
+mkdir -p "$RUNDIR"
+
+# This flag is necessary if there are multiple power managers on the system
+# using pm-powersave (eg, powernap, gnome-power-manager)
+
+case $1 in
+	true)
+		touch "$FLAG"
+	;;
+	false)
+		rm -f "$FLAG"
+	;;
+	query)
+		[ -e "$FLAG" ] && exit 0 || exit 1
+	;;
+esac

@@ -1,0 +1,113 @@
+#!/usr/bin/python
+#
+#    powernap_calculator - estimate power savings using statistcal analysis
+#    Copyright (C) 2009 Canonical Ltd.
+#
+#    Authors: Dustin Kirkland <kirkland@canonical.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, version 3 of the License.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+import getopt
+import sys
+
+# command line options
+short_opts = 'h:p:g:'
+long_opts = ['hosts=', 'guests-per-host=', 'guests=']
+usage_string = "Usage:\n  powernap_calculator [-h|--hosts NUM] [-p|--guests-per-host NUM] [-g|--guests NUM]"
+
+if len(sys.argv) != 7:
+  print(usage_string)
+  exit(1)
+
+# parse getopt options
+try:
+  opts, args = getopt.getopt(sys.argv[1:], short_opts, long_opts)
+  for k, v in opts:
+    if k in ('-h', '--hosts'):
+      hosts = int(v)
+    elif k in ('-p', '--guests-per-host'):
+      guests_per_host = int(v)
+    elif k in ('-g', '--guests'):
+      guests = int(v)
+    else:
+      print(usage_string)
+      exit(1)
+except:
+  print(usage_string)
+  exit(1)
+
+# convert an input num to a different base with each
+# digit as an element in the list;
+# ensure that the sum of the digits equals the number of guests;
+# return the list representing the way vm's are allocated across hosts
+def vm_allocations(num, base, hosts, guests):
+  list = [0]*hosts
+  i = 0
+  while num != 0:
+      remainder = num % base
+      list[i] = remainder
+      i += 1
+      num = num / base
+  if sum(list) == guests:
+    return list
+  else:
+    return -1
+
+# count the number of zero's found in the list
+def count_zeros(list):
+  count = 0
+  for i in list:
+    if i == 0:
+      count += 1
+  return count
+
+print("Calculating...\n     ")
+# this might be a *very* big number
+upper_limit = (guests_per_host+1)**hosts
+zeros = [0]*(hosts + 1)
+total = 0
+num = 0
+# brute force all possible combinations
+while num < upper_limit:
+  # determine the associated vm_allocations for this particular index
+  list = vm_allocations(num, guests_per_host+1, hosts, guests)
+  if list != -1:
+    # count the zeros in this list
+    c = count_zeros(list)
+    zeros[c] += 1
+    total += 1
+  # print a helpful running percent-done
+  if num % 100000 == 0:
+    print("\b\b\b\b\b\b\b\b\b\b%.3f%% " % (100.*num/upper_limit))
+  num += 1
+
+print("\nIn a cloud with [%d] hosts, which can handle [%d] guests-per-host, currently running [%d] guests,\nyou may expect the following:\n" % (hosts, guests_per_host, guests))
+
+expected_savings = 0
+#print zeros
+# do the calculations
+for i in range(0, len(zeros)):
+  if zeros[i] > 0:
+    probability = 1. * zeros[i] / total
+    if probability > 0 and probability < .01:
+      pstr = "<1"
+    else:
+      pstr = "%.1f" % (100. * probability)
+    savings = 100.*i/hosts
+    print("[%5s%%] likely that [%d/%d] of your hosts would powernap, for a [%.0f%%] power savings" % (pstr, i, hosts, savings))
+    expected_savings += probability * savings
+
+print("\nThe overall expected value is [%.1f%%] power savings." % expected_savings)
+
+exit(0)

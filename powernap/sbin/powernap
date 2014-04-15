@@ -1,0 +1,64 @@
+#!/bin/sh -e
+#
+#    powernap - have the system "take a nap"; this can be a user defined
+#               program or script at /etc/powernap/action, or a best-
+#               effort action among:
+#                 1) suspend
+#                 2) hibernate
+#                 3) poweroff
+#
+#    Copyright (C) 2009 Canonical Ltd.
+#
+#    Authors: Dustin Kirkland <kirkland@canonical.com>
+#             Andres Rodriguez <andreserl@ubuntu.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, version 3 of the License.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+PKG="powernap"
+ACTION_METHOD="$1"
+
+# Use the specified action, if configured
+# Otherwise, use the best available, supported sleep state
+best_effort() {
+	if [ -x "/etc/$PKG/action" ]; then
+		exec /etc/$PKG/action
+	elif pm-is-supported --suspend; then
+		exec /usr/sbin/pm-suspend
+	elif pm-is-supported --hibernate; then
+		exec /usr/sbin/pm-hibernate
+	else
+		exec /sbin/poweroff
+	fi
+}
+
+# Raise the flag
+echo "$ACTION_METHOD" > /var/run/powernap.state
+
+case $ACTION_METHOD in
+	0)
+		exec /usr/sbin/pm-powersave true
+		exit ;;
+	1)
+		exec /usr/sbin/pm-suspend
+		exit ;;
+	2)
+		exec /usr/sbin/pm-hibernate
+		exit ;;
+	3)
+		exec /sbin/poweroff
+		exit ;;
+	4)
+		best_effort
+		exit ;;
+esac

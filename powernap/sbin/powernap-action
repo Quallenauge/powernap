@@ -1,0 +1,149 @@
+#!/usr/bin/python
+#
+#    powernap-action - enable or disable actions when running powernap
+#                      Available actions at /usr/lib/powernap/actions.
+#                      Enabled actions at /etc/powernap/actions.d.
+#
+#    Copyright (C) 2010 Canonical Ltd.
+#
+#    Authors: Andres Rodriguez <andreserl@ubuntu.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, version 3 of the License.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import os, sys, subprocess
+from optparse import OptionParser
+
+global PKG
+PKG = "powernap"
+PM_ACTIONS_DIR = "/etc/pm/power.d"
+
+
+# If not running as root, exit program and display message
+if not os.geteuid()==0:
+    sys.exit("This utility may only be run by the root user.")
+
+# Check if action exists.
+def action_exists(action):
+    path = "%s/%s" % (PM_ACTIONS_DIR, action)
+    if os.path.exists(path):
+        return True
+    else:
+        return False
+
+# Check if action is enabled.
+def is_action_enabled(action):
+    path = "%s/%s" % (PM_ACTIONS_DIR, action)
+    if os.access(path, os.X_OK):
+        return True
+    else:
+        return False
+
+def do_action_enable(action):
+    src = "%s/%s" % (PM_ACTIONS_DIR, action)
+    info("enabling action [%s]..." % action)
+    os.chmod(src, 0o755)
+
+def do_action_disable(action):
+    path = "%s/%s" % (PM_ACTIONS_DIR, action)
+    info("disabling action [%s]..." % action)
+    #TODO: Not only remove, but undo changes if possible!!
+    os.chmod(path, 0o644)
+
+def list_available_actions():
+    #TODO: Display the actions and show which ones are enabled or disabled.
+    try:
+        actionslist = os.listdir(PM_ACTIONS_DIR)
+        for action in actionslist:
+            path = "%s/%s" % (PM_ACTIONS_DIR, action)
+            (status, output) = subprocess.getstatusoutput("%s help" % path)
+            if os.access(path, os.X_OK):
+                print("[enabled]  %-20s - %s" % (action, output))
+            else:
+                print("[disabled] %-20s - %s" % (action, output))
+    except:
+        error("Could not retrieve list of available actions")
+
+def get_action_status():
+    print("obtaining status of")
+
+def info(str):
+    print(("INFO: %s" % str))
+
+def error(str):
+    print(("ERROR: %s" % str))
+    sys.exit(1)
+
+if __name__ == '__main__':
+    hasOptions = False
+    # Option Parser
+    usage = "usage: %prog <parameters>\n\
+            \n\
+    %prog is a utility that allows to enable and disable available PowerNap\n\
+    actions.\n\
+    \n\
+    %prog --enable [action]\n\
+    %prog --disable [action]\n\
+    %prog --list"
+
+    parser = OptionParser(usage)
+    parser.add_option('-e', '--enable', action='store', type='string', dest='enable',
+                      help='enable available PowerNap actions', metavar='ACTION')
+    parser.add_option('-d', '--disable', action='store', type='string', dest='disable',
+                      help='disable available PowerNap actions', metavar='ACTION')
+    parser.add_option('-l', '--list', action='store_true', dest='list', help='Lists available actions')
+
+    (opt, args) = parser.parse_args()
+
+    if opt.list and opt.enable:
+        error("Options -l (--list) and -e (--enable) are mutually exclusive")
+        sys.exit(1)
+
+    if opt.list and opt.disable:
+        error("Options -l (--list) and -d (--disable) are mutually exclusive")
+
+    if opt.enable and opt.disable:
+        error("Options -e (--enable) and -d (--disable) are mutually exclusive")
+        sys.exit(1)
+
+    if opt.enable:
+        hasOptions = True
+        # Check if action exists, if not, exit
+        if not action_exists(opt.enable):
+            error("[%s] does not exist, exiting..." % opt.enable)
+            sys.exit(1)
+
+        # If action is not enabled, enable it, otherwise do nothing.
+        if not is_action_enabled(opt.enable):
+            do_action_enable(opt.enable)
+        else:
+            info("[%s] is already enabled, skipping..." % opt.enable)
+
+    if opt.disable:
+        hasOptions = True
+        # Check if action exists, if not, exit
+        if not action_exists(opt.disable):
+            error("[%s] does not exist, exiting..." % opt.disable)
+            sys.exit(1)
+
+        # If action is enabled, disable it, otherwise do nothing.
+	if is_action_enabled(opt.disable):
+            do_action_disable(opt.disable)
+        else:
+            info("[%s] is already disabled, skipping..." % opt.disable)
+
+    if opt.list:
+        hasOptions = True
+        list_available_actions()
+
+    if not hasOptions:
+        print(parser.get_usage())

@@ -1,0 +1,21 @@
+.TH powerwake-now 8 "16 Feb 2011" powernap "powernap"
+.SH NAME
+powerwake-now - send the powernapd daemon the 'powerwake now' signal
+
+
+.SH DESCRIPTION
+When the \fBpowernapd\fP(8) runs, it is monitoring the system, and determining when it should take the specificied powernap action.
+
+If the administrator (or even other utilities or processes) could asynchronously determine that the system should 'powerwake now' from the powersave mode, the \fBpowerwake-now\fP(8) can be used to send the \fBpowernapd\fP(8) a signal, which will log the event and force a wake-up from the powersave mode immediately.
+
+.TP
+\fIhttp://launchpad.net/powernap\fP
+.PD
+
+.SH SEE ALSO
+\fBpowernapd\fP(8), \fBpowernap\fP(8)
+
+.SH AUTHOR
+This manpage and the utility was written by Andres Rodriguez <andreserl@canonical.com> for Ubuntu systems (but may be used by others).  Permission is granted to copy, distribute and/or modify this document under the terms of the GNU General Public License, Version 3 published by the Free Software Foundation.
+
+On Debian systems, the complete text of the GNU General Public License can be found in /usr/share/common-licenses/GPL.

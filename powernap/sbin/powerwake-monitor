@@ -1,0 +1,155 @@
+#!/usr/bin/python
+#
+#    Copyright (C) 2011 Canonical Ltd.
+#
+#    Authors: Andres Rodriguez <andreserl@ubuntu.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, version 3 of the License.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import os, sys, subprocess
+from optparse import OptionParser
+from powerwake import powerwake
+
+global PKG
+PKG = "powerwake-monitor"
+
+# If not running as root, exit program and display message
+if not os.geteuid()==0:
+    sys.exit("This utility may only be run by the root user.")
+
+def error(error):
+    print(" ERROR: %s" % error)
+    sys.exit(1)
+
+def info(info):
+    print(" INFO: %s" % info)
+
+# Add IP to monitor
+def add_host_to_monitor(powerwake, host, macaddr, monitor):
+    # obtain the list of monitored machines
+    host_to_mac = powerwake.get_monitored_hosts(monitor.lower())
+    for ip, mac in host_to_mac.items():
+        if host == ip:
+            info("Updating information for [%s] in [%s] monitor" % (host, monitor))
+            mac = powerwake.get_mac_or_ip_from_arp(host)
+            if not mac:
+                error("Could not automatically determine MAC address for [%s]. Update cancelled." % host)
+            host_to_mac[host] = mac
+            powerwake.set_monitored_hosts(host_to_mac, monitor)
+            return
+
+    # add new
+    # 1. If only IP is specified, try to automatically determine MAC
+    if powerwake.is_ip(host) and macaddr is None:
+        mac = powerwake.get_mac_or_ip_from_arp(host)
+        if not mac:
+            error("Could not automatically determine MAC Address for [%s]. Please specify MAC address." % host)
+        # if mac given, look for ip
+        host_to_mac[host] = mac
+
+    # 2. If only MAC is specified, try to aumatically deftermine IP
+    if powerwake.is_mac(host) and macaddr is None:
+        ip = powerwake.get_mac_or_ip_from_arp(host)
+        if not ip:
+            error("Could not automatically determine IP address for [%s]. Please specify IP address." % host)
+        host_to_mac[ip] = host
+
+    # 3. If both MAC and IP are specified.
+    if host and macaddr:
+        info("Adding [%s - %s] to monitored hosts for [%s] monitor" % (host, macaddr, monitor))
+        host_to_mac[host] = macaddr
+
+    powerwake.set_monitored_hosts(host_to_mac, monitor)
+
+def delete_host_from_monitor(powerwake, host, monitor):
+    host_to_mac = powerwake.get_monitored_hosts(monitor.lower())
+    for ip, mac in host_to_mac.items():
+        if host == ip or host == mac:
+            info("Deleting %s from [%s] monitor" % (ip, monitor))
+            del host_to_mac[ip]
+            powerwake.set_monitored_hosts(host_to_mac, monitor)
+            break
+ 
+# List IP's to monitor
+def list_monitored_hosts(powerwake, monitor):
+    hosts = powerwake.get_monitored_hosts(monitor.lower())
+    print("          HOST       -        MAC")
+    try:
+        for ip, mac in hosts.items():
+            print("%+20s - %-20s" % (ip, mac))
+    except:
+        error("Could not obtain monitored hosts")
+
+def list_available_monitors(powerwake):
+    print(" Listing available PowerWaked Monitors\n")
+    for monitor in powerwake.MONITORS:
+        print(" [enabled] %+20s" % monitor['monitor'])
+
+if __name__ == '__main__':
+    powerwake = powerwake.PowerWake()
+    hasOptions = False
+    # Option Parser
+    usage = "usage: %prog <parameters>\n\
+            \n\
+    %prog is a utility that allows to enable and disable available PowerNap\n\
+    actions.\n\
+    \n\
+    %prog --add <IP> [-c <MAC>] [-m <monitor>]\n\
+    %prog --del <IP> | <MAC> [-m <monitor>]\n\
+    %prog --list [--monitor <monitor>]\n\
+    %prog --list-monitors"
+
+    parser = OptionParser(usage)
+    parser.add_option('-a', '--add', action='store', type='string', dest='add',
+                      help='Add host to Monitor', metavar='IP')
+    parser.add_option('-d', '--del', action='store', type='string', dest='delete',
+                      help='Delete monitored host', metavar='IP')
+    parser.add_option('-c', '--mac', action='store', type='string', dest='mac',
+                      help='specify MAC address', metavar='MAC', default=None)
+    parser.add_option('-m', '--monitor', action='store', type='string', dest='monitor',
+                      help='specify monitor to add host', metavar='MONITOR', default='general')
+    parser.add_option('-l', '--list', action='store_true', dest='list', help='List monitored hosts')
+    parser.add_option('-o', '--list-monitors', action='store_true', dest='list_monitors', help='List enabled monitors')
+
+    (opt, args) = parser.parse_args()
+
+    if opt.list and opt.add:
+        error("Options -l (--list) and -e (--enable) are mutually exclusive")
+        sys.exit(1)
+
+    if opt.list and opt.delete:
+        error("Options -l (--list) and -d (--disable) are mutually exclusive")
+        sys.exit(1)
+
+    if opt.add and opt.delete:
+        error("Options -e (--enable) and -d (--disable) are mutually exclusive")
+        sys.exit(1)
+
+    if opt.add:
+        hasOptions = True
+        add_host_to_monitor(powerwake, opt.add, opt.mac, opt.monitor)
+
+    if opt.delete:
+        hasOptions = True
+        delete_host_from_monitor(powerwake, opt.delete, opt.monitor)
+
+    if opt.list:
+        hasOptions = True
+        list_monitored_hosts(powerwake, opt.monitor)
+
+    if opt.list_monitors:
+        hasOptions = True
+        list_available_monitors(powerwake)
+
+    if not hasOptions:
+        print(parser.get_usage())

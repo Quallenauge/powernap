@@ -1,0 +1,41 @@
+.TH powernap 8 "2 Jul 2009" powernap "powernap"
+.SH NAME
+powernap - have the system "take a power nap"; this can be a user defined ACTION_METHOD in \fI/etc/powernap/config\fP among [best-effort, suspend, hibernate, poweroff, powersave]
+
+
+.SH DESCRIPTION
+powernap will run when \fBpowernapd\fP(8) has determined that an action needs to be taken according to its configured parameters. The action to be taken, among [best-effort, suspend, hibernate, poweroff], is determined in \fI/etc/powernap/config\fP. By default, the action will be \fBbest-effort\fP.
+
+When the ACTION_METHOD is \fBbest-effort\fP, and if the file \fI/etc/powernap/action\fP is executable, then the powernap binary will run it when called. Otherwise, powernap will run one of:
+  * pm-suspend
+  * pm-hibernate
+  * poweroff
+depending on your hardware's capabilities, as determined by \fBpm-is-supported\fP(1).
+
+You may do one of:
+  1) Write your own custom at \fI/etc/powernap/action\fP and make it executable
+  2) Replace \fI/etc/powernap/action\fP with an executable script or binary
+  3) Symlink \fI/etc/powernap/action\fP to some other executable script or binary
+
+When ACTION_METHOD is \fBpowersave\fP, then powernap binary will execute \fBpm-suspend\fP.
+
+When ACTION_METHOD is \fBpowersave\fP, then powernap binary will execute \fBpm-hibernate\fP.
+
+When ACTION_METHOD is \fBpowersave\fP, then powernap binary will execute \fBpoweroff\fP.
+
+When ACTION_METHOD is \fBpowersave\fP, then powernap binary will execute \fBpm-powersave\fP and pass an argument (true) to execute all the available scripts at \fI/usr/lib/pm-utils/power.d/\fP and \fI/etc/pm/power.d/\fP. The latter will contain scripts shipped with powernap.
+
+.TP
+\fIhttp://launchpad.net/powernap\fP
+.PD
+
+.SH FILES
+\fI/etc/powernap/action\fP, \fI/proc/acpi/sleep\fP
+
+.SH SEE ALSO
+\fBpowernapd\fP(8), \fBpm-is-supported\fP(1), \fBethtool\fP(8)
+
+.SH AUTHOR
+This manpage and the utility was written by Dustin Kirkland <kirkland@canonical.com> for Ubuntu systems (but may be used by others).  Permission is granted to copy, distribute and/or modify this document under the terms of the GNU General Public License, Version 3 published by the Free Software Foundation.
+
+On Debian systems, the complete text of the GNU General Public License can be found in /usr/share/common-licenses/GPL.

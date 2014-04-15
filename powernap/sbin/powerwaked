@@ -1,0 +1,192 @@
+#!/usr/bin/python
+#
+#    powerwaked - PowerNap Server Daemon
+#
+#    Copyright (C) 2011 Canonical Ltd.
+#
+#    Authors: Andres Rodriguez <andreserl@canonical.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, version 3 of the License.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Imports
+import subprocess
+import logging, logging.handlers
+import os
+import re
+import signal
+import sys
+import time
+import socket, traceback
+import struct
+from powerwake import powerwake
+
+powerwake.PKG = "powerwake"
+powerwake.DEBUG = int(3)
+powerwake.INTERVAL_SECONDS = int(1)
+
+
+# Initialize powerwake. This initialization loads the config file.
+try:
+    powerwake = powerwake.PowerWake()
+    pass
+except:
+    print("Unable to initialize PowerNap Server")
+    sys.exit(1)
+
+# Define globals
+global LOCK, CONFIG, MONITORS
+LOCK = "/var/run/%s.pid" % powerwake.PKG
+LOG = "/var/log/%s.log" % powerwake.PKG
+
+logging.basicConfig(filename=LOG, format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d_%H:%M:%S', level=logging.DEBUG,)
+
+# Generic debug function
+def debug(level, msg):
+    if level >= (logging.ERROR - 10*powerwake.DEBUG):
+        logging.log(level, msg)
+
+# Generic error function
+def error(msg):
+    debug(logging.ERROR, msg)
+    sys.exit(1)
+
+# Lock function, using a pidfile in /var/run
+def establish_lock():
+    if os.path.exists(LOCK):
+        f = open(LOCK,'r')
+        pid = f.read()
+        f.close()
+        error("Another instance is running [%s]" % pid)
+    else:
+        try:
+            f = open(LOCK,'w')
+        except:
+            error("Administrative privileges are required to run %s" % powerwake.PKG);
+        f.write(str(os.getpid()))
+        f.close()
+        # Set signal handlers
+        signal.signal(signal.SIGHUP, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGQUIT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGIO, signal.SIG_IGN)
+        signal.signal(signal.SIGUSR1, take_action_handler)
+
+# Clean up lock file on termination signals
+def signal_handler(signal, frame):
+    if os.path.exists(LOCK):
+        os.remove(LOCK)
+    debug(logging.INFO, "Stopping %s" % powerwake.PKG)
+    sys.exit(1)
+
+# Send a message to system users, that we're about to take an action,
+# and sleep for a grace period
+def warn_users():
+    timestamp = time.strftime("%Y-%m-%d_%H:%M:%S")
+    msg1 = "[%s] PowerNap will take the following action in [%s] seconds: [%s]" % (timestamp, powerwake.GRACE_SECONDS, powerwake.ACTION)
+    msg2 = "To cancel this operation, press any key in any terminal"
+    debug(logging.WARNING, msg1)
+    if powerwake.WARN:
+        subprocess.getoutput("echo '%s\n%s' | wall" % (msg1, msg2))
+
+# TODO: notify authorities about action taken
+def notify_authorities():
+    debug(logging.WARNING, "Taking action [%s]" % powerwake.ACTION)
+
+# Zero the counters and take the action
+def take_action():
+    notify_authorities()
+    debug(logging.DEBUG, "Reseting counters prior to taking action")
+    for monitor in MONITORS:
+        monitor._absent_seconds = 0
+    os.system("%s %s" % (powerwake.ACTION, powerwake.ACTION_METHOD))
+
+# Handler for asynchronous external signals
+def take_action_handler(signal, frame):
+    take_action()
+
+def powerwaked_loop():
+    # Starting the Monitors
+    for monitor in MONITORS:
+        debug(logging.DEBUG, "Starting [%s] Monitoring" % monitor._type)
+        for ip, mac in monitor._arp_cache.items():
+            debug(logging.DEBUG, "  Monitoring %s - %s" % (ip, mac))
+        monitor.start()
+
+    users_warned = False
+
+    while 1:
+        debug(logging.DEBUG, "Sleeping [%d] seconds" % powerwake.INTERVAL_SECONDS)
+        time.sleep(powerwake.INTERVAL_SECONDS)
+        # Examine monitor activity, compute absent time of each monitored monitor process
+        debug(logging.DEBUG, "Examining Monitors")
+        absent_monitors = 0
+        for monitor in MONITORS:
+            debug(logging.DEBUG, "  Looking for [%s] %s" % (monitor._name, monitor._type))
+            if monitor.active():
+                monitor._absent_seconds = 0
+                debug(logging.DEBUG, "    Activity found, reset absent time [%d]" % (monitor._absent_seconds))
+            else:
+                # activity not found, increment absent time
+                monitor._absent_seconds += powerwake.INTERVAL_SECONDS
+                debug(logging.DEBUG, "    Activity not found, increment absent time [%d]" % (monitor._absent_seconds))
+
+        # Determine if action needs to be taken
+        if absent_monitors > 0 and absent_monitors == len(MONITORS):
+            take_action()
+
+
+# "Forking a Daemon Process on Unix" from The Python Cookbook
+def daemonize (stdin="/dev/null", stdout="/var/log/%s.log" % powerwake.PKG, stderr="/var/log/%s.err" % powerwake.PKG):
+    try:
+        pid = os.fork()
+        if pid > 0:
+            sys.exit(0)
+    except OSError as e:
+        sys.stderr.write("fork #1 failed: (%d) %sn" % (e.errno, e.strerror))
+        sys.exit(1)
+    os.chdir("/")
+    os.setsid()
+    try:
+        pid = os.fork()
+        if pid > 0:
+            sys.exit(0)
+    except OSError as e:
+        sys.stderr.write("fork #2 failed: (%d) %sn" % (e.errno, e.strerror))
+        sys.exit(1)
+    f = open(LOCK,'w')
+    f.write(str(os.getpid()))
+    f.close()
+    for f in sys.stdout, sys.stderr: f.flush()
+    si = file(stdin, 'r')
+    so = file(stdout, 'a+')
+    se = file(stderr, 'a+', 0)
+    os.dup2(si.fileno(), sys.stdin.fileno())
+    os.dup2(so.fileno(), sys.stdout.fileno())
+    os.dup2(se.fileno(), sys.stderr.fileno())
+
+
+# Main program
+if __name__ == '__main__':
+    # Ensure that only one instance runs
+    establish_lock()
+    daemonize()
+    try:
+        # Run the main powernapd loop
+        MONITORS = powerwake.get_monitors()
+        debug(logging.INFO, "Starting %s" % powerwake.PKG)
+        powerwaked_loop()
+    finally:
+        # Clean up the lock file
+        if os.path.exists(LOCK):
+            os.remove(LOCK)

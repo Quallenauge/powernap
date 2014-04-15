@@ -1,0 +1,215 @@
+#!/usr/bin/python
+#
+#    powerwake - a smart remote host waking utility, supporting multiple
+#                waking methods, and caching known hostnames and addresses
+#
+#    Copyright (C) 2009 Canonical Ltd.
+#
+#    Authors: Dustin Kirkland <kirkland@canonical.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, version 3 of the License.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import commands
+import os
+import re
+import socket
+import struct
+import sys
+import getopt
+
+global DEBUG, PKG, RC, HOME
+DEBUG = 0
+PKG = "powerwake"
+RC = 0
+HOME = os.getenv("HOME")
+short_opts = 'hb:m:'
+long_opts = ['help', 'broadcast=', 'method=']
+usage_string = "Usage:\n  powerwake [-b|--broadcast BROADCAST_IP] [-m|--method METHOD] TARGET_MAC|TARGET_IP|TARGET_HOST"
+
+# Generic debug function
+def debug(level, msg):
+    if DEBUG >= level:
+        print("%s" % msg)
+
+# Generic error function
+def error(msg):
+    debug(0, "ERROR: %s" % msg)
+    ERROR = 1
+
+# Generic warning function
+def warning(msg):
+    debug(0, "WARNING: %s" % msg)
+
+# Generic info function
+def info(msg):
+    debug(0, "INFO: %s" % msg)
+
+def wakeonlan(mac):
+    nonhex = re.compile('[^0-9a-fA-F]')
+    mac = nonhex.sub('', mac)
+    if len(mac) != 12:
+        error("Malformed mac address [%s]" % mac)
+    info("Sending magic packet to: [%s]" % mac)
+    # We should cache this to /var/cache/powerwake/ethers,
+    # in case arp entry isn't available next time
+    data = ''.join(['FFFFFFFFFFFF', mac * 16])
+    send_data = ''
+    for i in range(0, len(data), 2):
+        send_data = ''.join([send_data, struct.pack('B', int(data[i: i + 2], 16))])
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.sendto(send_data, (broadcast, 7))
+    except:
+        error("Network is unreachable")
+
+def is_ip(ip):
+    r1 = re.compile('^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
+    if r1.match(ip):
+        return 1
+    else:
+        return 0
+
+def is_mac(mac):
+    r1 = re.compile('^[0-9a-fA-F]{12}$')
+    r2 = re.compile('^[0-9a-fA-F]{2}.[0-9a-fA-F]{2}.[0-9a-fA-F]{2}.[0-9a-fA-F]{2}.[0-9a-fA-F]{2}.[0-9a-fA-F]{2}$')
+    if r1.match(mac) or r2.match(mac):
+        return 1
+    else:
+        return 0
+
+# Source the cached, known arp entries
+def get_arp_cache():
+    host_to_mac = {}
+    for file in ["/var/cache/%s/ethers" % PKG, "/etc/ethers", "%s/.cache/ethers" % HOME]:
+        if os.path.exists(file):
+            f = open(file, 'r')
+            for i in f.readlines():
+                try:
+                    (m, h) = i.split()
+                    host_to_mac[h] = m
+                except:
+                    pass
+            f.close()
+    return host_to_mac
+
+# Source the current, working arp table
+def get_arp_current(host_to_mac):
+    # Load hostnames
+    for i in os.popen("/usr/sbin/arp"):
+        m = i.split()[2]
+        h = i.split()[0]
+        if is_mac(m):
+            host_to_mac[h] = m
+    # Load ip addresses
+    for i in os.popen("/usr/sbin/arp -n"):
+        m = i.split()[2]
+        h = i.split()[0]
+        if is_mac(m):
+            host_to_mac[h] = m
+    return host_to_mac
+
+def write_arp_cache(host_to_mac):
+    if not os.access("%s/.cache/" % HOME, os.W_OK):
+	return
+    if not os.path.exists("%s/.cache/" % HOME):
+        os.makedirs("%s/.cache/" % HOME)
+    f = open("%s/.cache/ethers" % HOME, 'a')
+    f.close()
+    for file in ["/var/cache/%s/ethers" % PKG, "%s/.cache/ethers" % HOME]:
+        if os.access(file, os.W_OK):
+            f = open(file, 'w')
+            for h in host_to_mac:
+                if is_mac(host_to_mac[h]):
+                    f.write("%s %s\n" % (host_to_mac[h], h))
+            f.close()
+
+def get_arp_hash():
+    host_to_mac = get_arp_cache()
+    host_to_mac = get_arp_current(host_to_mac)
+    write_arp_cache(host_to_mac)
+    return host_to_mac
+
+# TODO:
+#   Parameters to add:
+#     --list - list known mac/ip-host combinations
+#     --clear - clear the cache
+
+if __name__ == '__main__':
+    # set up defaults
+    broadcast = '<broadcast>'
+    method = 'wol'
+
+    # parse getopt options
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], short_opts, long_opts)
+    except:
+        print(usage_string)
+        exit(1)
+
+    for name, value in opts:
+        if name in ('-b', '--broadcast'):
+            if is_ip(value):
+                broadcast = value
+            else:
+                error("Value passed to " + name + " is not a valid broadcast address [%s]" % value)
+                print(usage_string)
+                exit(1)
+
+        elif name in ('-m', '--method'):
+            method = value
+        elif name in ('-h', '--help'):
+            print(usage_string)
+            exit(0)
+
+    # if args is less than one, we don't have a host to wake up
+    if len(args) < 1:
+        error("Please provide one or more MAC addresses, IP addresses, or Hostnames")
+        print(usage_string)
+        exit(1)
+
+    # Process command line parameters
+    for i in args:
+        # If parameter matches a system with a static configuration, use it!
+        # ^^^ Not yet implemented, default to wake-on-lan method for now
+        if method == "wol":
+            if is_mac(i):
+                # this appears to be a mac address, just use it
+                m = i
+                pass
+            else:
+	        # Retrieve the mac cache
+	        host_to_mac = get_arp_cache()
+                if host_to_mac.has_key(i):
+                    # mac found in the hash
+                    info("Trying to wake host: [%s]" % i)
+                    m = host_to_mac[i]
+		else:
+		    # not in the cache, do the expensive arp search
+	            host_to_mac = get_arp_hash()
+                    if host_to_mac.has_key(i):
+                        # mac found in the hash
+                        info("Trying to wake host: [%s]" % i)
+                        m = host_to_mac[i]
+                    else:
+                        # cannot autodetect the mac address
+                        error("Could not determine the MAC address of [%s]" % i)
+                        continue
+            if is_mac(m):
+                wakeonlan(m)
+            else:
+                error("Could not wake host [%s]" % m)
+        else:
+            error("Unsupported method [%s]" % method)
+            RC=1
+    sys.exit(RC)

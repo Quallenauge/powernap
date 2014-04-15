@@ -1,0 +1,44 @@
+.TH powernap-action 8 "19 Jan 2010" powernap "powernap-action"
+.SH NAME
+powernap-action \- enable or disable scripts to run when PowerNap's ACTION METHOD is PowerSave
+
+.SH SYNOPSIS
+.BI "powernap-action [\-e|\-\-enable ACTION] [\-d|\-\-disable ACTION ] [\-l|\-\-list]"
+
+.SH OPTIONS
+.TP
+.B \-e|\-\-enable ACTION
+Enable an ACTION script.
+.TP
+.B \-d|\-\-disable ACTION
+Disable an ACTION script.
+.TP
+.B \-l|\-\-list
+List available ACTIONS, with its current state (disabled or enabled). The ACTION scripts are available at \fI/etc/pm/power.d/\fP).
+
+.SH DESCRIPTION
+powernap-action will enable or disable any of the scripts available at \fI/etc/pm/power.d/\fP. These scripts are executed by \fBpm-powersave\fP when PowerNap ACTION METHOD is PowerSave. The ACTION_METHOD can be selected in \fI/etc/powernap/config\fP.
+
+Additionally, it can also list all the available scripts in \fI/etc/p/power.d/\fP. The list will show the available script, with is enabled or disabled status, and a description of what each scripts does.
+
+The scripts are compatible with \fBpm-utils\fP, to be able to be run with \fBpm-powersave\fP. If new scripts are added to \fI/etc/pm/power.d\fP and remain compatible to \fBpm-powersave\fp, \fBpowernap-action\fP will be able to perform the desired actions (enabled, disable, list).
+
+You may do one of:
+  1) \fBpowernap-action \-\-list\fP
+  2) \fBpowernap-action \-\-enable cpu_smp_sched\fP
+  3) \fBpowernap-action \-\-disable cpu_smp_sched\fP
+
+.TP
+\fIhttp://launchpad.net/powernap\fP
+.PD
+
+.SH FILES
+\fI/etc/powernap/config\fP
+
+.SH SEE ALSO
+\fBpowernapd\fP(8), \fBpm-powersave\fP(1)
+
+.SH AUTHOR
+This manpage and the utility was written by Andres Rodriguez <andreserl@ubuntu.com> for Ubuntu systems (but may be used by others).  Permission is granted to copy, distribute and/or modify this document under the terms of the GNU General Public License, Version 3 published by the Free Software Foundation.
+
+On Debian systems, the complete text of the GNU General Public License can be found in /usr/share/common-licenses/GPL.

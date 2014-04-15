@@ -1,0 +1,76 @@
+powernapd States
+ * asleep
+   * powernapd has successfully taken its action, and has not been awoken yet
+   * system could be in:
+     * custom      (cpu is online, monitors can run)
+     * powersaving (cpu is online, monitors can run)
+     * suspended   (cpu is offline)
+     * hibernated  (cpu is offline)
+     * powered off (cpu is offline)
+ * awake
+     * cpu is online monitors can run
+
+Monitors
+ * Network
+   * WOLMonitor 
+     * event:	 bind to ports 7 and 9 and watch for magic packet
+     * response: record timestamp on any WoL packet arrives
+		 wake immediately if asleep
+     * default:	 watch udp:7 or udp:9
+   * UDPMonitor 
+     * event:	 bind to specified ports and watch for activity
+     * response: record timestamp on any packet arrives on any of a list of specified udp ports
+		 wake immediately if asleep
+     * default:  no monitored ports
+   * TCPMonitor
+     * poll:     run every INTERVAL seconds, looking for connections on specified ports
+     * response: record timestamp on any established connection against a list of specified tcp ports
+		 wake immediately if asleep
+     * default:  no monitored ports (document that monitoring 22|80|443 might be useful)
+ * User Input
+   * USBMonitor
+     * response: record timestamp on any activity on USB input
+		 wake immediately if asleep
+     * default:  keyboard and mouse
+   * PS2Monitor
+     * response: record timestamp on any activity on PS2 input
+		 wake immediately if asleep
+     * default:  keyboard and mouse
+ * System
+   * Process
+     * poll:     run every INTERVAL seconds, looking for matching processes
+     * response: record timestamp on any process matching a list of regexes is running
+		 wake immediately if asleep
+     * default:  no monitored processes
+   * ProcessIO
+     * response: record timestamp on any process matching a list of regexes having active io
+		 wake immediately if asleep
+     * default: no monitored processes
+   * Load
+     * poll:     run every INTERVAL seconds, looking at /proc/loadavg
+     * response: record timestamp if system load is too high
+		 wake immediately if asleep
+     * default:  system_load / num_cpus > .75
+
+
+Approach 1:
+ * Run all monitors all the time
+ * Check all monitor timestamps every INTERVAL seconds
+ * Take powernap action (powersave by default) if no timestamp in last ABSENT_SECONDS
+ * Continue running monitors in powernap mode
+ * Wake from powernap any time any timestamp from any running monitor shows up
+ * This is potentially very expensive
+
+Approach 2:
+ * Run awake-monitors while awake, asleep-monitors while asleep
+
+Approach 3:
+ * Run all monitors at all times.
+ * During ABSENT_SECONDS, check activity every INTERVAL seconds
+ * During powersave, do NOT check every INTERVAL seconds, but use an EVENT based approach.
+ * Example:
+   - While in ABSENT_SECONDS TCPMonitor will be checked for activity every INTERVAL_SECONDS (10)
+     - If activity was found within the last INTERVAL_SECONDS, then reset absent seconds of monitor.
+   - While in POWERSAVE mode, the powernapd will stop polling, and TCPMonitor will send an EVENT
+     - This EVENT will instruct machine to take RECOVER ACTION.
+

@@ -1,0 +1,64 @@
+#!/bin/sh
+#
+#    service:  Disable/enable services (e.g. upstart wrapper)
+#
+#    Copyright (C) 2011 Canonical Ltd.
+#
+#    Authors: Bryce Harrington <bryce@canonoical.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, version 3 of the License.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+RUNDIR="/var/run/powernap"
+SERVICES="${RUNDIR}/services"
+
+disable_service() {
+    service_name=$1
+    echo "$service_name"
+    if [ -e /etc/init.d/${service_name} ]; then
+        mkdir -p ${SERVICES}
+        OUTPUT=$(service ${service_name} stop)
+        echo "$OUTPUT"
+        echo "OFF" > ${SERVICES}/${service_name}
+    fi
+}
+
+enable_service() {
+    service_name=$1
+    echo "$service_name"
+    if  [ -e /etc/init.d/${service_name} ] && \
+        [ -e ${SERVICES}/${service_name} ]; then
+        state=$(cat ${SERVICES}/${service_name})
+        if [ ${state} != 'OFF' ]; then
+            echo "WARNING: powernap shows ${service_name} in state {$state}.  Trying to re-enable anyway."
+        fi
+        OUTPUT=$(service ${service_name} start)
+        echo "$OUTPUT"
+        echo "ON" > ${SERVICES}/${service_name}
+    fi
+}
+
+help() {
+    echo "Usage: $0 <true|false> <service>"
+    echo "Ensure given service <is not|is> running"
+}
+
+case $1 in
+	true)
+		disable_service $2 ;;
+	false)
+		enable_service $2 ;;
+	help)
+		help ;;
+	*)
+		exit $NA ;;
+esac

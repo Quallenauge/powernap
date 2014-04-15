@@ -1,0 +1,37 @@
+# powerwake(1) completion
+
+have powerwake &&
+_powerwake()
+{
+    local cur prev options files targets
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    options="-b --broadcast -m --method"
+    files="/etc/ethers /var/cache/powerwake/ethers $HOME/.cache/ethers"
+    targets="$( cat ${files} 2>/dev/null | awk '{print $2}' )"
+
+    case "${prev}" in
+        -@(b|-broadcast))
+            COMPREPLY=( $( compgen -W "$( LANG=C ifconfig 2>/dev/null | \
+                awk '/Bcast:/ {print $3}' | awk -F ':' '{print $2}' )" \
+                -- ${cur} ) )
+            return 0
+            ;;
+        -@(m|-method))
+            COMPREPLY=( $( compgen -W "wol" -- ${cur} ) )
+            return 0
+            ;;
+        *)
+        ;;
+    esac
+
+    if [[ ${cur} == -* ]] ; then
+        COMPREPLY=( $( compgen -W "${options}" -- ${cur} ) )
+        return 0
+    else
+        COMPREPLY=( $( compgen -W "${targets}" -- ${cur} ) );
+        return 0
+    fi
+}
+complete -F _powerwake powerwake

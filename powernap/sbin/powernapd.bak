@@ -1,0 +1,348 @@
+#!/usr/bin/python
+#
+#    powernapd - monitor a system process table; if IDLE amount of time
+#               goes by with no MONITORED_PROCESSES running, run ACTION
+#
+#    Copyright (C) 2009-2011 Canonical Ltd.
+#
+#    Authors: Dustin Kirkland <kirkland@canonical.com>
+#             Andres Rodriguez <andreserl@canonical.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, version 3 of the License.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Imports
+import commands
+import logging, logging.handlers
+import os
+import re
+import signal
+import sys
+import time
+import socket, traceback
+import struct
+from powernap import powernap
+
+
+# Initialize Powernap. This initialization loads the config file.
+try:
+    powernap = powernap.PowerNap()
+    #os.putenv("ACTION_METHOD", str(powernap.ACTION_METHOD))
+except:
+    print("Unable to initialize PowerNap")
+    sys.exit(1)
+
+# Define globals
+global LOCK, CONFIG, MONITORS
+LOCK = "/var/run/%s.pid" % powernap.PKG
+LOG = "/var/log/%s.log" % powernap.PKG
+POWERSAVE_FLAG = "/var/run/%s/powersave" % powernap.PKG
+
+logging.basicConfig(filename=LOG, format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d_%H:%M:%S', level=logging.DEBUG,)
+
+# Generic debug function
+def debug(level, msg):
+    if level >= (logging.ERROR - 10*powernap.DEBUG):
+        logging.log(level, msg)
+
+# Generic error function
+def error(msg):
+    debug(logging.ERROR, msg)
+    sys.exit(1)
+
+# Lock function, using a pidfile in /var/run
+def establish_lock():
+    if os.path.exists(LOCK):
+        f = open(LOCK,'r')
+        pid = f.read()
+        f.close()
+        error("Another instance is running [%s]" % pid)
+    else:
+        try:
+            f = open(LOCK,'w')
+        except:
+            error("Administrative privileges are required to run %s" % powernap.PKG);
+        f.write(str(os.getpid()))
+        f.close()
+        # Set signal handlers
+        signal.signal(signal.SIGHUP, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGQUIT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGIO, signal.SIG_IGN)
+        #signal.signal(signal.SIGIO, input_singal_handler)
+        signal.signal(signal.SIGUSR1, take_action_handler)
+        signal.signal(signal.SIGUSR2, take_recover_action_handler)
+
+# Clean up lock file on termination signals
+def signal_handler(signal, frame):
+    if os.path.exists(LOCK):
+        os.remove(LOCK)
+    debug(logging.INFO, "Stopping %s" % powernap.PKG)
+    sys.exit(1)
+
+# Handler warns users when an USB Input device has been connected or
+# disconnected. This is only useful for [InputMonitor] to avoid errors.
+def input_signal_handler(signal, frame):
+    debug(logging.WARNING, "A monitored [InputMonitor] device has been disconnected or reconnected.")
+
+# Send a message to system users, that we're about to take an action,
+# and sleep for a grace period
+def warn_users():
+    timestamp = time.strftime("%Y-%m-%d_%H:%M:%S")
+    msg1 = "[%s] PowerNap will take the following action in [%s] seconds: [%s]" % (timestamp, powernap.GRACE_SECONDS, powernap.ACTION)
+    msg2 = "To cancel this operation, press any key in any terminal"
+    debug(logging.WARNING, msg1)
+    if powernap.WARN:
+        commands.getoutput("echo '%s\n%s' | wall" % (msg1, msg2))
+
+# TODO: notify authorities about action taken
+def notify_authorities():
+    debug(logging.WARNING, "Taking action [%s]" % powernap.ACTION)
+
+# In powersave mode or not?
+def in_powersave():
+    global POWERSAVE_FLAG
+    if os.path.exists(POWERSAVE_FLAG):
+	return True
+    else:
+        return False
+
+# Basic touch function
+def touch(fname, times = None):
+    with file(fname, 'a'):
+        os.utime(fname, times)
+
+# flag_powersave
+def flag_powersave():
+    global POWERSAVE_FLAG
+    touch(POWERSAVE_FLAG)
+
+# unflag_powersave
+def unflag_powersave():
+    global POWERSAVE_FLAG
+    if os.path.exists(POWERSAVE_FLAG):
+        os.unlink(POWERSAVE_FLAG)
+
+# Recover action for ACTION_METHOD=0 (pm-powersave).
+def take_recover_action():
+    debug(logging.WARNING, "Taking recover action [%s]" % powernap.RECOVER_ACTION)
+    os.system(powernap.RECOVER_ACTION)
+    unflag_powersave()
+    for monitor in MONITORS:
+        monitor._absent_seconds = 0
+    if os.path.exists("/var/run/powernap.state"):
+	os.unlink("/var/run/powernap.state")
+    # Re-enable SERVICES/MODULES when waking from PowerSave
+    # TODO: This should probably go into their own executable.
+    if powernap.KERN_MODULES:
+        debug(logging.WARNING, "Re-enabling Kernel Modules")
+        for module in powernap.KERN_MODULES:
+            debug(logging.WARNING, "  Module [%s]" % module)
+            os.system("/etc/powernap/actions/kernel_module false %s" % module)
+    if powernap.SERVICES:
+        debug(logging.WARNING, "Re-enabling Services")
+        for service in powernap.SERVICES:
+            debug(logging.WARNING, "  Service [%s]" % service)
+            os.system("/etc/powernap/actions/service false %s" % service)
+    debug(logging.DEBUG, "Reseting counters after taking recover action")
+
+# Handler for asynchronous external signals
+def take_recover_action_handler(signal, frame):
+    if powernap.ACTION_METHOD == 0:
+        take_recover_action()
+
+# Zero the counters and take the action
+def take_action():
+    notify_authorities()
+    debug(logging.DEBUG, "Reseting counters prior to taking action")
+    for monitor in MONITORS:
+        monitor._absent_seconds = 0
+    os.system("%s %s" % (powernap.ACTION, powernap.ACTION_METHOD))
+    # Disable MODULES/SERVICES when on PowerSave if defined.
+    # TODO: This should probably go into their own executable.
+    if powernap.ACTION_METHOD == 0:
+        if powernap.KERN_MODULES:
+            debug(logging.WARNING, "Disabling Kernel Modules")
+            for module in powernap.KERN_MODULES:
+                debug(logging.WARNING, "  Kernel Module [%s]" % module)
+                os.system("/etc/powernap/actions/kernel_module true %s" % module)
+        if powernap.SERVICES:
+            debug(logging.WARNING, "Disabling Services")
+            for service in powernap.SERVICES:
+                debug(logging.WARNING, "  Service [%s]" % service)
+                os.system("/etc/powernap/actions/service true %s" % service)
+
+# Handler for asynchronous external signals
+def take_action_handler(signal, frame):
+    take_action()
+    if powernap.ACTION_METHOD == 0:
+        unflag_powersave()
+
+def take_action_stage2():
+    notify_authorities()
+    debug(logging.DEBUG, "Reseting counters prior to taking action")
+    for monitor in MONITORS:
+        monitor._absent_seconds = 0
+    os.system("%s %s" % (powernap.ACTION, powernap.STAGE2_ACTION_METHOD))
+
+def powernapd_loop():
+    # Starting the Monitors
+    for monitor in MONITORS:
+        debug(logging.DEBUG, "Starting [%s:%s]" % (monitor._type, monitor._name))
+        monitor.start()
+
+    grace_seconds = powernap.GRACE_SECONDS
+    stage2_grace_seconds = int(powernap.STAGE2_ABSENT_SECONDS/4)
+    unflag_powersave()
+    users_warned = False
+    watch_config_timestamp = os.stat(powernap.CONFIG).st_mtime
+
+    while 1:
+        if powernap.WATCH_CONFIG == True:
+            if watch_config_timestamp != os.stat(powernap.CONFIG).st_mtime:
+                # TODO: This only reloads general settings. Does not restart monitors.
+                # In the future, this should also stop/start monitors when reloading.
+                debug(logging.WARNING, "Reloading configuration file")
+                powernap.load_config_file()
+                watch_config_timestamp = os.stat(powernap.CONFIG).st_mtime
+        debug(logging.DEBUG, "Sleeping [%d] seconds" % powernap.INTERVAL_SECONDS)
+        time.sleep(powernap.INTERVAL_SECONDS)
+        # Examine monitor activity, compute absent time of each monitored monitor process
+        if in_powersave():
+            debug(logging.DEBUG, "Examining Monitors - Running in PowerSave mode")
+        else:
+            debug(logging.DEBUG, "Examining Monitors")
+        absent_monitors = 0
+        grace_monitors = 0
+        stage2_grace_monitors = 0
+        stage2_absent_monitors = 0
+        for monitor in MONITORS:
+            debug(logging.DEBUG, "  Looking for [%s] %s" % (monitor._name, monitor._type))
+            if monitor.active():
+                monitor._absent_seconds = 0
+                grace_seconds = powernap.GRACE_SECONDS
+                users_warned = False
+                debug(logging.DEBUG, "    Activity found, reset absent time [%d/%d]" % (monitor._absent_seconds, powernap.ABSENT_SECONDS))
+                if in_powersave() and powernap.ACTION_METHOD == 0:
+                    take_recover_action()
+                    break
+            elif in_powersave():
+                # activity during POWERSAVE mode. Only increments absent_seconds and provides logging.
+                monitor._absent_seconds += powernap.INTERVAL_SECONDS
+                debug(logging.DEBUG, "    Activity not found, increment absent time [%d/%d]" % (monitor._absent_seconds, powernap.ABSENT_SECONDS))
+
+                if powernap.stage2_action_enabled:
+                    # second stage absent seconds: If monitor is absent for (STAGE2_ABSENT_SECONDS),
+                    # we consider it in second stage for action method 
+                    if monitor._absent_seconds >= (powernap.STAGE2_ABSENT_SECONDS) and powernap.stage2_action_enabled:
+                        stage2_absent_monitors += 1
+                    if monitor._absent_seconds >= (powernap.STAGE2_ABSENT_SECONDS - int(powernap.STAGE2_ABSENT_SECONDS/4)):
+                        stage2_grace_monitors += 1
+            else:
+                # activity not found, increment absent time
+                monitor._absent_seconds += powernap.INTERVAL_SECONDS
+                debug(logging.DEBUG, "    Activity not found, increment absent time [%d/%d]" % (monitor._absent_seconds, powernap.ABSENT_SECONDS))
+
+                if monitor._absent_seconds >= (powernap.ABSENT_SECONDS - powernap.GRACE_SECONDS):
+                    # If monitor is absent for (ABSENT_SECONDS - GRACE_SECONDS), we consider it in GRACE PERIOD.
+                    grace_monitors += 1
+
+                if monitor._absent_seconds >= powernap.ABSENT_SECONDS:
+                    # activity missing for >= absent_seconds threshold, mark absent
+                    debug(logging.DEBUG, "    Activity absent for >= threshold, so mark absent")
+                    absent_monitors += 1
+
+        # GRACE PERIOD: Time between ABSENT_SECONDS and (ABSENT_SECONDS - GRACE_SECONDS)
+        # If all monitors are in their own GRACE period
+        if grace_monitors > 0 and grace_monitors == len(MONITORS):
+            if users_warned is False and powernap.ACTION_METHOD != 0:
+                # Only display warn_users() wall message if action is something other than
+		# powersave, and only when initially entering to GRACE_PERIOD.
+                # If in GRACE_PERIOD but a warn_users() already issued, then ignore condition.
+                warn_users()
+                users_warned = True
+            debug(logging.WARNING, "Entered into GRACE PERIOD. Action [%s] will be taken in [%d] seconds" % (powernap.ACTION, grace_seconds))
+            grace_seconds -= powernap.INTERVAL_SECONDS
+            if grace_seconds == -1:
+                # Reset flags to original if powerwake finished GRACE PERIOD and ready to take action
+                grace_seconds = powernap.GRACE_SECONDS
+                users_warned = False
+
+        # Determine if action needs to be taken
+        if absent_monitors > 0 and absent_monitors == len(MONITORS):
+            take_action()
+
+            # If ACTION_METHOD is PowerSave then flag. Use is when tracking Monitor Activity
+            if powernap.ACTION_METHOD == 0:
+                flag_powersave()
+
+        if powernap.stage2_action_enabled:
+            if stage2_grace_monitors > 0 and stage2_grace_monitors == len(MONITORS):
+                if users_warned is False:
+                    warn_users()
+                    users_warned = True
+                debug(logging.WARNING, "Second Stage Action [%s] will be taken in [%d] seconds" % (powernap.ACTION, stage2_grace_seconds))
+                stage2_grace_seconds -= powernap.INTERVAL_SECONDS
+                if stage2_grace_seconds == -1:
+                    stage2_grace_seconds = int(powernap.STAGE2_ABSENT_SECONDS/4)
+                    users_warned = False
+
+            if in_powersave() and stage2_absent_monitors > 0 and stage2_absent_monitors == len(MONITORS):
+                unflag_powersave()
+                take_action_stage2()
+
+
+# "Forking a Daemon Process on Unix" from The Python Cookbook
+def daemonize (stdin="/dev/null", stdout="/var/log/%s.log" % powernap.PKG, stderr="/var/log/%s.err" % powernap.PKG):
+    try:
+        pid = os.fork()
+        if pid > 0:
+            sys.exit(0)
+    except OSError, e:
+        sys.stderr.write("fork #1 failed: (%d) %sn" % (e.errno, e.strerror))
+        sys.exit(1)
+    os.chdir("/")
+    os.setsid()
+    try:
+        pid = os.fork()
+        if pid > 0:
+            sys.exit(0)
+    except OSError, e:
+        sys.stderr.write("fork #2 failed: (%d) %sn" % (e.errno, e.strerror))
+        sys.exit(1)
+    f = open(LOCK,'w')
+    f.write(str(os.getpid()))
+    f.close()
+    for f in sys.stdout, sys.stderr: f.flush()
+    si = file(stdin, 'r')
+    so = file(stdout, 'a+')
+    se = file(stderr, 'a+', 0)
+    os.dup2(si.fileno(), sys.stdin.fileno())
+    os.dup2(so.fileno(), sys.stdout.fileno())
+    os.dup2(se.fileno(), sys.stderr.fileno())
+
+
+# Main program
+if __name__ == '__main__':
+    # Ensure that only one instance runs
+    establish_lock()
+    daemonize()
+    try:
+        # Run the main powernapd loop
+        MONITORS = powernap.get_monitors()
+        debug(logging.INFO, "Starting %s" % powernap.PKG)
+        powernapd_loop()
+    finally:
+        # Clean up the lock file
+        if os.path.exists(LOCK):
+            os.remove(LOCK)
