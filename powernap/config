@@ -19,7 +19,7 @@
 # "/usr/lib/pm-utils/power.d".
 # The best-effort method, witll first, it will try a user-defined script
 # at "/etc/powernap/action", or suspend, hibernate, poweroff.
-ACTION_METHOD = 0
+ACTION_METHOD = 4
 
 # Number of seconds that all monitors must have no activity or must be absent.
 # The default is an absence period of 30 seconds.
@@ -72,7 +72,7 @@ DEBUG = 2
 # The default value is n.
 #    WATCH_CONFIG = y
 #    WATCH_CONFIG = n
-WATCH_CONFIG = n
+WATCH_CONFIG = y
 
 # Kernel Modules that are to be disabled when running PowerNap on Powersave
 # mode
