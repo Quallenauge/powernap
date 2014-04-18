@@ -34,19 +34,23 @@ def get_local_wol_data(mac):
     mac = nonhex.sub('', mac)
     if len(mac) != 12:
         error("Malformed mac address [%s]" % mac)
-    data = ''.join(['FFFFFFFFFFFF', mac * 16])
-    wol_data = ''
+    error("Getting mac address {0}".format(mac))
+    data = b'FFFFFFFFFFFF' + (mac * 16).encode()
+    wol_data = b''
     for i in range(0, len(data), 2):
-        wol_data = ''.join(map(str, [wol_data, struct.pack('B', int(data[i: i + 2], 16))]))
+        wol_data += struct.pack('B', int(data[i: i + 2], 16))
     return wol_data
 
 # Obtain a list of available eth's, with its MAC address and WoL data.
 def get_eths_mac_wol_info():
     ifaces = []
-    prefix = re.compile("eth")
+    #Using all network devices, it is also possible to define a specific one like eth for all devices starting with eth*
+    prefix = re.compile("")
     dirs = os.listdir("/sys/class/net")
     for iface in dirs:
+        error("Found iface: [%s]" % iface)
         if prefix.search(iface):
+            error("Using interface [%s] for further analysis" % iface)
             # Obtain MAC address
             mac = get_mac_address(iface)
             # Obtain WoL data of eth
@@ -97,12 +101,14 @@ class WoLMonitor (threading.Thread):
         #while isRunning:
         while self._running:
             try:
-                #debug(logging.DEBUG, "    WoL monitor started at port [%s]" % port)
-                recv_wol_msg, address = s.recvfrom(1024)
-                #debug(logging.DEBUG, "    WoL packet received from %s" % address[0])
+                #error("    WoL monitor started at port [%s]" % self._port)
+                #recv_wol_msg, address = s.recvfrom(1024)
+                recv_wol_msg, address = s.recvfrom(2048)
+                #error("    WoL packet received from %s" % address[0])
                 for iface in ifaces:
+                    #error("\nrecv: [{0}]\ncalc: [{1}]".format(recv_wol_msg, iface["wol"]));
                     if recv_wol_msg == iface["wol"]:
-                        #debug(logging.DEBUG, "    WoL data matches local interface [%s]" % iface["iface"])
+                        #error("    WoL data matches local interface [%s]" % iface["iface"])
                         self._data_received = True
                         #isRunning = False
 			# TODO: Should return signal to daemon and wake up???
@@ -123,3 +129,4 @@ class WoLMonitor (threading.Thread):
 # ###########################################################################
 
 # vim:sts=4:ts=4:sw=4:et
+
